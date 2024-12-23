@@ -3,19 +3,12 @@ package config
 import (
 	"database/sql"
 	"log"
-	"os"
 
 	_ "github.com/glebarez/sqlite"
 )
 
 func Database() *sql.DB {
-	loadEnv()
-
-	dbPath := os.Getenv("DBPATH")
-
-	var err error
-
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", "./abirelhamd.db")
 
 	if err != nil {
 		log.Fatal(err)
