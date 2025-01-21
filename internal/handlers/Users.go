@@ -97,12 +97,18 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	database := config.Database()
 	defer database.Close()
 
-	user := models.Users{}
+	userInterface := map[string]interface{}{}
 
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&userInterface); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
+
+	user := models.Users{}
+
+	user.Name = userInterface["name"].(string)
+	user.Password = userInterface["password"].(string)
+	user.Role = userInterface["role"].(string)
 
 	if err := models.AddUser(database, user); err != nil {
 		middleware.ErrorResopnse(w, err)

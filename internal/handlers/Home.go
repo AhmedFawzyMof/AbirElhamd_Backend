@@ -233,23 +233,33 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	totalIncome, err := strconv.Atoi(r.FormValue("total_income"))
-	if err != nil {
-		fmt.Println(err)
-		log.Println("Error converting total_income:", err)
-		return
+	var totalIncome int
+	var fixedExpenses int
+	var Age int
+
+	if totalIncome, err = strconv.Atoi(r.FormValue("total_income")); err == nil {
+		totalIncome, err = strconv.Atoi(r.FormValue("total_income"))
+		if err != nil {
+			fmt.Println(err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
 	}
 
-	fixedExpenses, err := strconv.Atoi(r.FormValue("fixed_expenses"))
-	if err != nil {
-		log.Println("Error converting fixed_expenses:", err)
-		return
+	if fixedExpenses, err = strconv.Atoi(r.FormValue("fixed_expenses")); err == nil {
+		totalIncome, err = strconv.Atoi(r.FormValue("total_income"))
+		if err != nil {
+			log.Println("Error converting fixed_expenses:", err)
+			return
+		}
 	}
 
-	Age, err := strconv.Atoi(r.FormValue("age"))
-	if err != nil {
-		log.Println("Error converting age:", err)
-		return
+	if Age, err = strconv.Atoi(r.FormValue("age")); err == nil {
+		Age, err = strconv.Atoi(r.FormValue("age"))
+		if err != nil {
+			log.Println("Error converting age:", err)
+			return
+		}
 	}
 
 	now := time.Now()
@@ -278,7 +288,6 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 		Created_at:                    createdAt,
 		Updated_at:                    createdAt,
 	}
-
 
 	if err := Case.Create(db); err != nil {
 		middleware.ErrorResopnse(w, err)
@@ -448,20 +457,25 @@ func UpdateCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	age, err := strconv.Atoi(casesUpdate["age"].(string))
+	var totalIncome int
+	var Age int
 
-	if err != nil {
-		fmt.Println(err)
-		middleware.ErrorResopnse(w, err)
-		return
+	if Age, err = strconv.Atoi(casesUpdate["age"].(string)); err == nil {
+		Age, err = strconv.Atoi(casesUpdate["age"].(string))
+		if err != nil {
+			fmt.Println(err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
 	}
 
-	total_income, err := strconv.Atoi(casesUpdate["total_income"].(string))
-
-	if err != nil {
-		fmt.Println(err)
-		middleware.ErrorResopnse(w, err)
-		return
+	if totalIncome, err = strconv.Atoi(casesUpdate["total_income"].(string)); err == nil {
+		totalIncome, err = strconv.Atoi(casesUpdate["total_income"].(string))
+		if err != nil {
+			fmt.Println(err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
 	}
 
 	now := time.Now()
@@ -472,8 +486,8 @@ func UpdateCase(w http.ResponseWriter, r *http.Request) {
 		Case_name:                     sql.NullString{String: casesUpdate["case_name"].(string), Valid: casesUpdate["case_name"].(string) != ""},
 		National_id:                   sql.NullString{String: casesUpdate["national_id"].(string), Valid: casesUpdate["national_id"].(string) != ""},
 		Devices_needed_for_the_case:   sql.NullString{String: casesUpdate["devices_needed_for_the_case"].(string), Valid: casesUpdate["devices_needed_for_the_case"].(string) != ""},
-		Total_income:                  sql.NullInt32{Int32: int32(total_income), Valid: total_income != 0},
-		Age:                           sql.NullInt32{Int32: int32(age), Valid: age != 0},
+		Total_income:                  sql.NullInt32{Int32: int32(totalIncome), Valid: totalIncome != 0},
+		Age:                           sql.NullInt32{Int32: int32(Age), Valid: Age != 0},
 		Gender:                        sql.NullString{String: casesUpdate["gender"].(string), Valid: casesUpdate["gender"].(string) != ""},
 		Job:                           sql.NullString{String: casesUpdate["job"].(string), Valid: casesUpdate["job"].(string) != ""},
 		Social_situation:              sql.NullString{String: casesUpdate["social_situation"].(string), Valid: casesUpdate["social_situation"].(string) != ""},
@@ -486,7 +500,6 @@ func UpdateCase(w http.ResponseWriter, r *http.Request) {
 		PhoneNumbers:                  sql.NullString{String: casesUpdate["phone_numbers"].(string), Valid: casesUpdate["phone_numbers"].(string) != ""},
 		Updated_at:                    updated_at,
 	}
-
 
 	db := config.Database()
 	defer db.Close()

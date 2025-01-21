@@ -6,10 +6,10 @@ import (
 )
 
 type Logs struct {
-	Id             int    `json:"id"`
-	CaseId         string `json:"case_id"`
-	Operation_type string `json:"operation_type"`
-	UserId         string `json:"user_id"`
+	Id             int            `json:"id"`
+	CaseId         sql.NullString `json:"case_id"`
+	Operation_type sql.NullString `json:"operation_type"`
+	UserId         sql.NullString `json:"user_id"`
 }
 
 func CreateLogs(db *sql.DB, case_id, operation_type, user_id string) error {
