@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -139,11 +138,11 @@ func FilterKids(w http.ResponseWriter, r *http.Request) {
 
 	offset := limit - 30
 
-	FilterdCases := models.FilterdCases{}
-
+	FilterdCases := models.Cases{}
 	CasesTable := models.Cases{}
+	RelativesTable := models.Relatives{}
 
-	Cases, err := FilterdCases.FilterCasesByRelativeAge(database, district, from, to, limit, offset)
+	Cases, err := FilterdCases.FilterCasesByRelativeAge(database, district, from, to, 30, offset)
 
 	if err != nil {
 		middleware.ErrorResopnse(w, err)
@@ -157,10 +156,23 @@ func FilterKids(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ids := []any{}
+	for _, c := range Cases {
+		ids = append(ids, c.Id.String)
+	}
+
+	relatives, err := RelativesTable.GetByCasesIDS(database, ids)
+
+	if err != nil {
+		middleware.ErrorResopnse(w, err)
+		return
+	}
+
 	Res := map[string]interface{}{
 		"Cases":     Cases,
 		"Pages":     len(Cases),
 		"Districts": Districts,
+		"Relatives": relatives,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -199,24 +211,23 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 	}
 	id := uuid.New().String()
 
-	err = os.MkdirAll("./uploads/"+id, 0755)
-
-	if err != nil {
-		fmt.Println(err)
-		middleware.ErrorResopnse(w, err)
-		return
-	}
-
 	files := r.MultipartForm.File["files"]
 
 	for _, fileHeader := range files {
 		file, err := fileHeader.Open()
 		if err != nil {
-
 			middleware.ErrorResopnse(w, err)
 			return
 		}
 		defer file.Close()
+
+		err = os.MkdirAll("./uploads/"+id, 0755)
+
+		if err != nil {
+			fmt.Println(err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
 
 		dst, err := os.Create("./uploads/" + id + "/" + fileHeader.Filename)
 		if err != nil {
@@ -235,35 +246,113 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 
 	var totalIncome int
 	var fixedExpenses int
-	var Age int
+	var age int
+	var subsidiesID int
+	var socialStatus int
+	var husbandID int
 
-	if totalIncome, err = strconv.Atoi(r.FormValue("total_income")); err == nil {
+	if r.FormValue("total_income") != "" {
 		totalIncome, err = strconv.Atoi(r.FormValue("total_income"))
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error converting total_income:", err)
 			middleware.ErrorResopnse(w, err)
 			return
 		}
 	}
 
-	if fixedExpenses, err = strconv.Atoi(r.FormValue("fixed_expenses")); err == nil {
-		totalIncome, err = strconv.Atoi(r.FormValue("total_income"))
+	if r.FormValue("fixed_expenses") != "" {
+		fixedExpenses, err = strconv.Atoi(r.FormValue("fixed_expenses"))
 		if err != nil {
-			log.Println("Error converting fixed_expenses:", err)
+			fmt.Println("Error converting fixed_expenses:", err)
+			middleware.ErrorResopnse(w, err)
 			return
 		}
 	}
 
-	if Age, err = strconv.Atoi(r.FormValue("age")); err == nil {
-		Age, err = strconv.Atoi(r.FormValue("age"))
+	if r.FormValue("age") != "" {
+		age, err = strconv.Atoi(r.FormValue("age"))
 		if err != nil {
-			log.Println("Error converting age:", err)
+			fmt.Println("Error converting age:", err)
+			middleware.ErrorResopnse(w, err)
 			return
 		}
+	}
+
+	if r.FormValue("subsidies_id") != "" {
+		subsidiesID, err = strconv.Atoi(r.FormValue("subsidies_id"))
+		if err != nil {
+			fmt.Println("Error converting subsidies_id:", err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
+	}
+
+	if r.FormValue("social_status") != "" {
+		socialStatus, err = strconv.Atoi(r.FormValue("social_status"))
+		if err != nil {
+			fmt.Println("Error converting social_status:", err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
+	}
+
+	if r.FormValue("husband_id") != "" {
+		husbandID, err = strconv.Atoi(r.FormValue("husband_id"))
+		if err != nil {
+			fmt.Println("Error converting husband_id:", err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
+	}
+
+	egyptLoc, err := time.LoadLocation("Africa/Cairo")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
 	}
 
 	now := time.Now()
-	createdAt := sql.NullString{String: now.Format(time.RFC3339), Valid: true}
+	currentTime := sql.NullString{String: now.In(egyptLoc).Format(time.RFC3339), Valid: true}
+
+	var dateOfSocialSituation sql.NullTime
+	if len(r.MultipartForm.Value["date_of_social_situation"]) > 0 {
+		if r.MultipartForm.Value["date_of_social_situation"][0] != "" {
+			parsedTime, err := time.ParseInLocation("2006-01-02", r.MultipartForm.Value["date_of_social_situation"][0], egyptLoc)
+			if err == nil {
+				dateOfSocialSituation = sql.NullTime{Time: parsedTime, Valid: true}
+			}
+		}
+	}
+
+	var caseEntryDate sql.NullTime
+	if len(r.MultipartForm.Value["case_entry_date"]) > 0 {
+		if r.MultipartForm.Value["case_entry_date"][0] != "" {
+			parsedTime, err := time.ParseInLocation("2006-01-02", r.MultipartForm.Value["case_entry_date"][0], egyptLoc)
+			if err == nil {
+				caseEntryDate = sql.NullTime{Time: parsedTime, Valid: true}
+			}
+		}
+	}
+
+	var statusSearchUpdateDate sql.NullTime
+	if len(r.MultipartForm.Value["status_search_update_date"]) > 0 {
+		if r.MultipartForm.Value["status_search_update_date"][0] != "" {
+			parsedTime, err := time.ParseInLocation("2006-01-02", r.MultipartForm.Value["status_search_update_date"][0], egyptLoc)
+			if err == nil {
+				statusSearchUpdateDate = sql.NullTime{Time: parsedTime, Valid: true}
+			}
+		}
+	}
+
+	var fieldResearchHistory sql.NullTime
+	if len(r.MultipartForm.Value["field_research_history"]) > 0 {
+		if r.MultipartForm.Value["field_research_history"][0] != "" {
+			parsedTime, err := time.ParseInLocation("2006-01-02", r.MultipartForm.Value["field_research_history"][0], egyptLoc)
+			if err == nil {
+				fieldResearchHistory = sql.NullTime{Time: parsedTime, Valid: true}
+			}
+		}
+	}
 
 	Case := models.Cases{
 		Id:                            sql.NullString{String: id, Valid: id != ""},
@@ -277,7 +366,7 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 		Debts:                         sql.NullString{String: r.FormValue("debts"), Valid: r.FormValue("debts") != ""},
 		Case_type:                     sql.NullString{String: r.FormValue("case_type"), Valid: r.FormValue("case_type") != ""},
 		Date_of_birth:                 sql.NullString{String: r.FormValue("date_of_birth"), Valid: r.FormValue("date_of_birth") != ""},
-		Age:                           sql.NullInt32{Int32: int32(Age), Valid: Age != 0},
+		Age:                           sql.NullInt32{Int32: int32(age), Valid: age != 0},
 		Gender:                        sql.NullString{String: r.FormValue("gender"), Valid: r.FormValue("gender") != ""},
 		Job:                           sql.NullString{String: r.FormValue("job"), Valid: r.FormValue("job") != ""},
 		Social_situation:              sql.NullString{String: r.FormValue("social_situation"), Valid: r.FormValue("social_situation") != ""},
@@ -285,8 +374,16 @@ func AddCase(w http.ResponseWriter, r *http.Request) {
 		Actual_address:                sql.NullString{String: r.FormValue("actual_address"), Valid: r.FormValue("actual_address") != ""},
 		District:                      sql.NullString{String: r.FormValue("district"), Valid: r.FormValue("district") != ""},
 		PhoneNumbers:                  sql.NullString{String: r.FormValue("phone_numbers"), Valid: r.FormValue("phone_numbers") != ""},
-		Created_at:                    createdAt,
-		Updated_at:                    createdAt,
+		Subsidies_id:                  sql.NullInt32{Int32: int32(subsidiesID), Valid: subsidiesID != 0},
+		Social_status:                 sql.NullInt32{Int32: int32(socialStatus), Valid: socialStatus != 0},
+		Husband_id:                    sql.NullInt32{Int32: int32(husbandID), Valid: husbandID != 0},
+		Created_at:                    currentTime,
+		Updated_at:                    currentTime,
+		Date_Of_Social_situation:      dateOfSocialSituation,
+		Case_entry_date:               caseEntryDate,
+		Status_search_update_date:     statusSearchUpdateDate,
+		Field_research_history:        fieldResearchHistory,
+		Living_expenses:               sql.NullString{String: r.FormValue("living_expenses"), Valid: r.FormValue("living_expenses") != ""},
 	}
 
 	if err := Case.Create(db); err != nil {
@@ -365,7 +462,7 @@ func CaseApi(w http.ResponseWriter, r *http.Request) {
 
 	id := r.PathValue("id")
 
-	Case := models.CaseDitails{
+	Case := models.Cases{
 		Id: sql.NullString{
 			String: id,
 			Valid:  true,
@@ -375,8 +472,70 @@ func CaseApi(w http.ResponseWriter, r *http.Request) {
 	cas, err := Case.Get(db)
 
 	if err != nil {
+		fmt.Println("case", err)
 		if err.Error() != "sql: no rows in result set" {
-			fmt.Println(err)
+			middleware.ErrorResopnse(w, err)
+			return
+		}
+	}
+
+	RelativesModel := models.Relatives{
+		Case_id: sql.NullString{
+			String: cas.Id.String,
+			Valid:  true,
+		},
+	}
+
+	relatives, err := RelativesModel.GetByCaseID(db, cas.Id.String)
+
+	if err != nil {
+		fmt.Println("relatives", err)
+		middleware.ErrorResopnse(w, err)
+		return
+	}
+
+	HusbandsModel := models.Husband{
+		Case_id: sql.NullString{
+			String: cas.Id.String,
+			Valid:  true,
+		},
+	}
+
+	husbands, err := HusbandsModel.GetByCaseID(db)
+
+	if err != nil {
+		fmt.Println("husband", err)
+		middleware.ErrorResopnse(w, err)
+		return
+	}
+
+	SubsidiesModel := models.Subsidies{
+		Case_id: sql.NullString{
+			String: cas.Id.String,
+			Valid:  true,
+		},
+	}
+
+	subsidies, err := SubsidiesModel.GetByCaseID(db)
+
+	if err != nil {
+		fmt.Println("subsidies", err)
+		middleware.ErrorResopnse(w, err)
+		return
+	}
+
+	SocialSituation := models.SS{
+		Case_id: sql.NullString{
+			String: cas.Id.String,
+			Valid:  true,
+		},
+	}
+
+	ss, err := SocialSituation.GetByCaseID(db)
+
+	if err != nil {
+		fmt.Println("ss", err)
+		if err.Error() != "sql: no rows in result set" {
 			middleware.ErrorResopnse(w, err)
 			return
 		}
@@ -397,8 +556,12 @@ func CaseApi(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Response := map[string]interface{}{
-		"Data":     cas,
-		"hasFiles": exists,
+		"Case":         cas,
+		"Relatives":    relatives,
+		"Husbands":     husbands,
+		"Subsidies":    subsidies,
+		"SocialStatus": ss,
+		"hasFiles":     exists,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -434,90 +597,115 @@ func SearchCase(w http.ResponseWriter, r *http.Request) {
 
 func UpdateCase(w http.ResponseWriter, r *http.Request) {
 	token, err := middleware.GetToken(r)
-
 	if err != nil {
-		fmt.Println(err)
 		middleware.ErrorResopnse(w, err)
 		return
 	}
 
 	userData, err := middleware.ValidateToken(token)
-
 	if err != nil {
-		fmt.Println(err)
 		middleware.ErrorResopnse(w, err)
 		return
-	}
-
-	var casesUpdate map[string]interface{}
-
-	if err := json.NewDecoder(r.Body).Decode(&casesUpdate); err != nil {
-		fmt.Println(err)
-		middleware.ErrorResopnse(w, err)
-		return
-	}
-
-	var totalIncome int
-	var Age int
-
-	if Age, err = strconv.Atoi(casesUpdate["age"].(string)); err == nil {
-		Age, err = strconv.Atoi(casesUpdate["age"].(string))
-		if err != nil {
-			fmt.Println(err)
-			middleware.ErrorResopnse(w, err)
-			return
-		}
-	}
-
-	if totalIncome, err = strconv.Atoi(casesUpdate["total_income"].(string)); err == nil {
-		totalIncome, err = strconv.Atoi(casesUpdate["total_income"].(string))
-		if err != nil {
-			fmt.Println(err)
-			middleware.ErrorResopnse(w, err)
-			return
-		}
-	}
-
-	now := time.Now()
-	updated_at := sql.NullString{String: now.Format(time.RFC3339), Valid: true}
-
-	cases := models.Cases{
-		Id:                            sql.NullString{String: casesUpdate["id"].(string), Valid: casesUpdate["id"].(string) != ""},
-		Case_name:                     sql.NullString{String: casesUpdate["case_name"].(string), Valid: casesUpdate["case_name"].(string) != ""},
-		National_id:                   sql.NullString{String: casesUpdate["national_id"].(string), Valid: casesUpdate["national_id"].(string) != ""},
-		Devices_needed_for_the_case:   sql.NullString{String: casesUpdate["devices_needed_for_the_case"].(string), Valid: casesUpdate["devices_needed_for_the_case"].(string) != ""},
-		Total_income:                  sql.NullInt32{Int32: int32(totalIncome), Valid: totalIncome != 0},
-		Age:                           sql.NullInt32{Int32: int32(Age), Valid: Age != 0},
-		Gender:                        sql.NullString{String: casesUpdate["gender"].(string), Valid: casesUpdate["gender"].(string) != ""},
-		Job:                           sql.NullString{String: casesUpdate["job"].(string), Valid: casesUpdate["job"].(string) != ""},
-		Social_situation:              sql.NullString{String: casesUpdate["social_situation"].(string), Valid: casesUpdate["social_situation"].(string) != ""},
-		Address_from_national_id_card: sql.NullString{String: casesUpdate["address_from_national_id_card"].(string), Valid: casesUpdate["address_from_national_id_card"].(string) != ""},
-		Actual_address:                sql.NullString{String: casesUpdate["actual_address"].(string), Valid: casesUpdate["actual_address"].(string) != ""},
-		District:                      sql.NullString{String: casesUpdate["district"].(string), Valid: casesUpdate["district"].(string) != ""},
-		Debts:                         sql.NullString{String: casesUpdate["debts"].(string), Valid: casesUpdate["debts"].(string) != ""},
-		Pension_from_husband:          sql.NullString{String: casesUpdate["pension_from_husband"].(string), Valid: casesUpdate["pension_from_husband"].(string) != ""},
-		Pension_from_father:           sql.NullString{String: casesUpdate["pension_from_father"].(string), Valid: casesUpdate["pension_from_father"].(string) != ""},
-		PhoneNumbers:                  sql.NullString{String: casesUpdate["phone_numbers"].(string), Valid: casesUpdate["phone_numbers"].(string) != ""},
-		Updated_at:                    updated_at,
 	}
 
 	db := config.Database()
 	defer db.Close()
 
-	if err := cases.Update(db); err != nil {
+	var body map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		middleware.ErrorResopnse(w, errors.New("invalid JSON body"))
+		return
+	}
+
+	getString := func(key string) sql.NullString {
+		if val, ok := body[key].(string); ok && val != "" {
+			return sql.NullString{String: val, Valid: true}
+		}
+		return sql.NullString{}
+	}
+
+	getInt := func(key string) sql.NullInt32 {
+		if val, ok := body[key].(float64); ok {
+			return sql.NullInt32{Int32: int32(val), Valid: true}
+		}
+		return sql.NullInt32{}
+	}
+
+	getBool := func(key string) sql.NullBool {
+		if val, ok := body[key].(bool); ok {
+			return sql.NullBool{Bool: val, Valid: true}
+		}
+		return sql.NullBool{}
+	}
+
+	getDate := func(key string) sql.NullTime {
+		if val, ok := body[key].(string); ok && val != "" {
+			parsed, err := time.Parse("2006-01-02", val)
+			if err == nil {
+				return sql.NullTime{Time: parsed, Valid: true}
+			}
+		}
+		return sql.NullTime{}
+	}
+
+	caseData := models.Cases{
+		Id:                            getString("id"),
+		Case_name:                     getString("case_name"),
+		National_id:                   getString("national_id"),
+		Devices_needed_for_the_case:   getString("devices_needed_for_the_case"),
+		Total_income:                  getInt("total_income"),
+		Fixed_expenses:                getInt("fixed_expenses"),
+		Pension_from_husband:          getString("pension_from_husband"),
+		Pension_from_father:           getString("pension_from_father"),
+		Debts:                         getString("debts"),
+		Case_type:                     getString("case_type"),
+		Date_of_birth:                 getString("date_of_birth"),
+		Age:                           getInt("age"),
+		Gender:                        getString("gender"),
+		Job:                           getString("job"),
+		Social_situation:              getString("social_situation"),
+		Address_from_national_id_card: getString("address_from_national_id_card"),
+		Actual_address:                getString("actual_address"),
+		District:                      getString("district"),
+		PhoneNumbers:                  getString("phone_numbers"),
+		Subsidies_id:                  getInt("subsidies_id"),
+		Social_status:                 getInt("social_status"),
+		Husband_id:                    getInt("husband_id"),
+		Deleted:                       getBool("deleted"),
+		Date_Of_Social_situation:      getDate("date_of_social_situation"),
+		Case_entry_date:               getDate("case_entry_date"),
+		Status_search_update_date:     getDate("status_search_update_date"),
+		Field_research_history:        getDate("field_research_history"),
+		Living_expenses:               getString("living_expenses"),
+	}
+
+	if !caseData.Id.Valid || caseData.Id.String == "" {
+		middleware.ErrorResopnse(w, errors.New("missing case id"))
+		return
+	}
+
+	egyptLoc, err := time.LoadLocation("Africa/Cairo")
+	if err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
 
-	if err := models.CreateLogs(db, cases.Id.String, "تعديل على معلومات الحالة", userData.Id); err != nil {
+	caseData.Updated_at = sql.NullString{
+		String: time.Now().In(egyptLoc).Format(time.RFC3339),
+		Valid:  true,
+	}
+
+	err = caseData.Update(db)
+	if err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
 
-	Response := map[string]interface{}{"status": "تمت العملية بنجاح"}
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(Response); err != nil {
+	err = models.CreateLogs(db, caseData.Id.String, "تعديل على معلومات الحالة", userData.Id)
+	if err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "تم تعديل الحالة بنجاح"})
 }

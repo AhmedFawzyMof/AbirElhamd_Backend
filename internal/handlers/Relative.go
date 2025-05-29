@@ -4,6 +4,7 @@ import (
 	"abir-el-hamd/internal/config"
 	"abir-el-hamd/internal/middleware"
 	"abir-el-hamd/internal/models"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -30,16 +31,16 @@ func AddRelative(w http.ResponseWriter, r *http.Request) {
 	}
 
 	relative := models.Relatives{
-		Type:             data["relative_type"].(string),
-		Name:             data["relative_name"].(string),
-		National_id:      data["relative_national_id"].(string),
-		Date_of_birth:    data["relative_date_of_birth"].(string),
-		Age:              age,
-		Gender:           data["relative_gender"].(string),
-		Job:              data["relative_job"].(string),
-		Social_situation: data["relative_social_situation"].(string),
-		Health_status:    data["relative_health_status"].(string),
-		Education:        data["relative_education"].(string),
+		Type:             sql.NullString{String: data["relative_type"].(string), Valid: true},
+		Name:             sql.NullString{String: data["relative_name"].(string), Valid: true},
+		National_id:      sql.NullString{String: data["relative_national_id"].(string), Valid: true},
+		Date_of_birth:    sql.NullString{String: data["relative_date_of_birth"].(string), Valid: true},
+		Age:              sql.NullInt32{Int32: int32(age), Valid: true},
+		Gender:           sql.NullString{String: data["relative_gender"].(string), Valid: true},
+		Job:              sql.NullString{String: data["relative_job"].(string), Valid: true},
+		Social_situation: sql.NullString{String: data["relative_social_situation"].(string), Valid: true},
+		Health_status:    sql.NullString{String: data["relative_health_status"].(string), Valid: true},
+		Education:        sql.NullString{String: data["relative_education"].(string), Valid: true},
 	}
 
 	err = relative.Add(database, id)
@@ -80,17 +81,17 @@ func UpdateRelative(w http.ResponseWriter, r *http.Request) {
 	}
 
 	relative := models.Relatives{
-		Id:               id,
-		Type:             data["relative_type"].(string),
-		Name:             data["relative_name"].(string),
-		National_id:      data["relative_national_id"].(string),
-		Date_of_birth:    data["relative_date_of_birth"].(string),
-		Age:              age,
-		Gender:           data["relative_gender"].(string),
-		Job:              data["relative_job"].(string),
-		Social_situation: data["relative_social_situation"].(string),
-		Health_status:    data["relative_health_status"].(string),
-		Education:        data["relative_education"].(string),
+		Id:               sql.NullInt32{Int32: int32(id), Valid: true},
+		Type:             sql.NullString{String: data["relative_type"].(string), Valid: true},
+		Name:             sql.NullString{String: data["relative_name"].(string), Valid: true},
+		National_id:      sql.NullString{String: data["relative_national_id"].(string), Valid: true},
+		Date_of_birth:    sql.NullString{String: data["relative_date_of_birth"].(string), Valid: true},
+		Age:              sql.NullInt32{Int32: int32(age), Valid: true},
+		Gender:           sql.NullString{String: data["relative_gender"].(string), Valid: true},
+		Job:              sql.NullString{String: data["relative_job"].(string), Valid: true},
+		Social_situation: sql.NullString{String: data["relative_social_situation"].(string), Valid: true},
+		Health_status:    sql.NullString{String: data["relative_health_status"].(string), Valid: true},
+		Education:        sql.NullString{String: data["relative_education"].(string), Valid: true},
 	}
 
 	err = relative.UPDATE(database, case_id)
@@ -121,7 +122,7 @@ func DeleteRelative(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sub := models.Relatives{
-		Id: id,
+		Id: sql.NullInt32{Int32: int32(id), Valid: true},
 	}
 
 	if err := sub.DELETE(database); err != nil {

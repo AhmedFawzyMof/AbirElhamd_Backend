@@ -4,6 +4,7 @@ import (
 	"abir-el-hamd/internal/config"
 	"abir-el-hamd/internal/middleware"
 	"abir-el-hamd/internal/models"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,7 +22,6 @@ func AddSS(w http.ResponseWriter, r *http.Request) {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
-
 
 	id := data["case_id"].(string)
 
@@ -42,15 +42,16 @@ func AddSS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s := models.SS{
-		Properties:                    data["properties"].(string),
-		Health_status:                 data["health_status"].(string),
-		Education:                     data["education"].(string),
-		Number_of_family_members:      nofm,
-		Number_of_registered_children: norc,
-		Total_number_of_children:      tnoc,
+		Properties:                    sql.NullString{String: data["properties"].(string), Valid: true},
+		Health_status:                 sql.NullString{String: data["health_status"].(string), Valid: true},
+		Education:                     sql.NullString{String: data["education"].(string), Valid: true},
+		Number_of_family_members:      sql.NullInt64{Int64: int64(nofm), Valid: true},
+		Number_of_registered_children: sql.NullInt64{Int64: int64(norc), Valid: true},
+		Total_number_of_children:      sql.NullInt64{Int64: int64(tnoc), Valid: true},
+		Case_id:                       sql.NullString{String: id, Valid: true},
 	}
 
-	if err := s.Add(database, id); err != nil {
+	if err := s.Add(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
@@ -99,20 +100,20 @@ func UpdateSS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s := models.SS{
-		Id:                            id,
-		Properties:                    data["properties"].(string),
-		Health_status:                 data["health_status"].(string),
-		Education:                     data["education"].(string),
-		Number_of_family_members:      nofm,
-		Number_of_registered_children: norc,
-		Total_number_of_children:      tnoc,
+		Id:                            sql.NullInt64{Int64: int64(id), Valid: true},
+		Properties:                    sql.NullString{String: data["properties"].(string), Valid: true},
+		Health_status:                 sql.NullString{String: data["health_status"].(string), Valid: true},
+		Education:                     sql.NullString{String: data["education"].(string), Valid: true},
+		Number_of_family_members:      sql.NullInt64{Int64: int64(nofm), Valid: true},
+		Number_of_registered_children: sql.NullInt64{Int64: int64(norc), Valid: true},
+		Total_number_of_children:      sql.NullInt64{Int64: int64(tnoc), Valid: true},
+		Case_id:                       sql.NullString{String: case_id, Valid: true},
 	}
 
-	if err := s.UPDATE(database, case_id); err != nil {
+	if err := s.UPDATE(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
-
 
 	Response := map[string]interface{}{
 		"success": "تمت العملية بنجاح",
@@ -124,16 +125,25 @@ func UpdateSS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func DeleteSS(w http.ResponseWriter, r *http.Request) {
 	database := config.Database()
 	defer database.Close()
 
-	id := r.PathValue("id")
+	id, err := strconv.Atoi(r.PathValue("id"))
 
-	ss := models.SS{}
+	if err != nil {
+		middleware.ErrorResopnse(w, err)
+		return
+	}
 
-	if err := ss.DELETE(database, id); err != nil {
+	ss := models.SS{
+		Id: sql.NullInt64{
+			Int64: int64(id),
+			Valid: true,
+		},
+	}
+
+	if err := ss.DELETE(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}

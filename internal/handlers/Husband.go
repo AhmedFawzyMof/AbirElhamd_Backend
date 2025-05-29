@@ -4,6 +4,7 @@ import (
 	"abir-el-hamd/internal/config"
 	"abir-el-hamd/internal/middleware"
 	"abir-el-hamd/internal/models"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,14 +32,15 @@ func AddHusband(w http.ResponseWriter, r *http.Request) {
 	}
 
 	husband := models.Husband{
-		Husband_name:          data["name"].(string),
-		Husband_national_id:   data["national_id"].(string),
-		Husband_date_of_birth: data["date_of_birth"].(string),
-		Husband_age:           age,
-		Husband_gender:        data["gender"].(string),
+		Name:          sql.NullString{String: data["name"].(string), Valid: true},
+		National_id:   sql.NullString{String: data["national_id"].(string), Valid: true},
+		Date_of_birth: sql.NullString{String: data["date_of_birth"].(string), Valid: true},
+		Age:           sql.NullInt32{Int32: int32(age), Valid: true},
+		Gender:        sql.NullString{String: data["gender"].(string), Valid: true},
+		Case_id:       sql.NullString{String: id, Valid: true},
 	}
 
-	if err := husband.Add(database, id); err != nil {
+	if err := husband.Add(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
@@ -78,15 +80,16 @@ func UpdateHusband(w http.ResponseWriter, r *http.Request) {
 	id := int(data["id"].(float64))
 
 	husband := models.Husband{
-		Id:                    id,
-		Husband_name:          data["name"].(string),
-		Husband_national_id:   data["national_id"].(string),
-		Husband_date_of_birth: data["date_of_birth"].(string),
-		Husband_age:           age,
-		Husband_gender:        data["gender"].(string),
+		Id:            sql.NullInt32{Int32: int32(id), Valid: true},
+		Name:          sql.NullString{String: data["name"].(string), Valid: true},
+		National_id:   sql.NullString{String: data["national_id"].(string), Valid: true},
+		Date_of_birth: sql.NullString{String: data["date_of_birth"].(string), Valid: true},
+		Age:           sql.NullInt32{Int32: int32(age), Valid: true},
+		Gender:        sql.NullString{String: data["gender"].(string), Valid: true},
+		Case_id:       sql.NullString{String: case_id, Valid: true},
 	}
 
-	if err := husband.UPDATE(database, case_id); err != nil {
+	if err := husband.UPDATE(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
@@ -105,11 +108,21 @@ func DeleteHusband(w http.ResponseWriter, r *http.Request) {
 	database := config.Database()
 	defer database.Close()
 
-	id := r.PathValue("id")
+	id, err := strconv.Atoi(r.PathValue("id"))
 
-	sub := models.Husband{}
+	if err != nil {
+		middleware.ErrorResopnse(w, err)
+		return
+	}
 
-	if err := sub.DELETE(database, id); err != nil {
+	husband := models.Husband{
+		Id: sql.NullInt32{
+			Int32: int32(id),
+			Valid: true,
+		},
+	}
+
+	if err := husband.DELETE(database); err != nil {
 		middleware.ErrorResopnse(w, err)
 		return
 	}
